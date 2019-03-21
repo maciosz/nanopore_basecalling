@@ -1,79 +1,70 @@
+#!/usr/bin/python
 # coding: utf-8
 import sys
 import h5py
+import argparse
 import pandas
 import numpy as np
 import matplotlib.pyplot as plt
-
-infile = sys.argv[1]
-
-start_seq, end_seq = 0, 10
-if len(sys.argv) == 4:
-    start_seq, end_seq = [int(i) for i in sys.argv[2:]]
-
-read = h5py.File(infile, "r")
-events = read['Analyses/RawGenomeCorrected_000/BaseCalled_template/Events'][start_seq : end_seq]
-
-# calosc
-#plt.plot(read['Raw/Reads/Read_289/Signal'])
-#plt.show()
-
-# od zresquigglowanego poczatku
-#plt.plot(read['Raw/Reads/Read_289/Signal'][1863:])
-#plt.show()
-
-starts = [i[2] for i in events]
-start_sygnal = read['Analyses/RawGenomeCorrected_000/BaseCalled_template/Events'].attrs['read_start_rel_to_raw']
-
-#???
-end_sygnal = starts[-1] + start_sygnal
-read_id = list(read["Raw/Reads"].items())[0][0]
-sygnal_all = read['Raw/Reads/' + read_id + '/Signal']
 
 def mad(arr): 
     med = np.median(arr) 
     return np.median(np.abs(arr - med)) 
 
-sygnal_shift = np.median(sygnal_all)
-sygnal_scale = mad(sygnal_all)
-sygnal = sygnal_all[start_sygnal + starts[0] : end_sygnal]
-sygnal = np.array(sygnal, dtype='float64')
-sygnal -= sygnal_shift
-sygnal /= sygnal_scale
+def argument_parsing():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', dest='input', action='store',
+                        help='fast5 file with resquiggled signal')
+    parser.add_argument('-o', dest='output', action='store', default=None,
+                        help='name of the output file (by default figure is shown, not saved)')
+    parser.add_argument('-s', dest='start', type=int, default=0,
+                        help='plot from this nucleotide (zero-based, inclusive)')
+    parser.add_argument('-e', dest='end', type=int, default=10,
+                        help='plot to this nucleotide (zero-based, inclusive)')
+    parser.add_argument('--events-adress',
+                        default= 'Analyses/RawGenomeCorrected_000/BaseCalled_template/Events',
+                        help='where the events are stored')
+    return parser.parse_args()
 
-# poczatkowy fragment
-#plt.plot(sygnal)
-#plt.show()
+def main():
+    arguments = argument_parsing()
+    read = h5py.File(arguments.input, "r")
+    start, end = arguments.start, arguments.end
+    events = read[arguments.events_adress][start : end+2]
+    starts = [i[2] for i in events]
+    start_sygnal = read[arguments.events_adress].attrs['read_start_rel_to_raw']
+    #???
+    end_sygnal = starts[-1] + start_sygnal
+    read_id = list(read["Raw/Reads"].items())[0][0]
+    sygnal_all = read['Raw/Reads/' + read_id + '/Signal']
+    sygnal_shift = np.median(sygnal_all)
+    sygnal_scale = mad(sygnal_all)
+    sygnal = sygnal_all[start_sygnal + starts[0] : end_sygnal]
+    sygnal = np.array(sygnal, dtype='float64')
+    sygnal -= sygnal_shift
+    sygnal /= sygnal_scale
+    starts = [i - starts[0] for i in starts]
+    mids = []
+    for i in range(len(starts)-1):
+        mid = starts[i+1] - starts[i]
+        mid /= 2
+        mid += starts[i]
+        mids.append(mid)
+    #mids = [mids[i] + starts[i] for i in range(len(mids))]
+    sekwencja = [str(i[4]) for i in events]
+    sekwencja = ''.join(sekwencja)
+    mean_values = [i[0] for i in events][:-1]
+    mean_sygnal = sum(sygnal) / len(sygnal)
+    plt.plot(sygnal)
+    plt.plot(starts, [mean_sygnal] * len(starts), '|')
+    plt.hlines(y=mean_values, xmin=starts[:-1], xmax=starts[1:])
+    for i in range(len(mids)):
+        plt.text(mids[i], mean_sygnal, sekwencja[i])
+    if not arguments.output:
+        plt.show()
+    else:
+        plt.savefig(arguments.output)
 
-starts = [i - starts[0] for i in starts]
+if __name__ == '__main__':
+    main()
 
-mids = []
-for i in range(len(starts)-1):
-    mid = starts[i+1] - starts[i]
-    mid /= 2
-    mid += starts[i]
-    mids.append(mid)
-    
-#mids = [mids[i] + starts[i] for i in range(len(mids))]
-print events
-sekwencja = [str(i[4]) for i in events]
-sekwencja = ''.join(sekwencja)
-mean_values = [i[0] for i in events][:-1]
-
-mean_sygnal = sum(sygnal) / len(sygnal)
-
-
-# poczatkowy fragment z naniesionym resquigglowaniem
-plt.plot(sygnal)
-plt.plot(starts, [mean_sygnal] * len(starts), 'o')
-plt.hlines(y=mean_values, xmin=starts[:-1], xmax=starts[1:])
-for i in range(len(mids)):
-    plt.text(mids[i], mean_sygnal, sekwencja[i])
-    # mozna by dorysowac 'schodki' ze srednich w danych fragmentach
-plt.show()
-
-# po tym przykladzie widac ze cos jest nie tak:
-# python drawing_resquiggled_signal.py tombo_testing/data/fast5/read1.fast5 15 30
-# czemu? wyglada ok
-# nie liczac tego ze ciezko znalezc jakis pattern w tym jaki poziom odpowiada jakiemu nukleotydowi...
-# ale moze na poziomie calych piatek jest jakis pattern

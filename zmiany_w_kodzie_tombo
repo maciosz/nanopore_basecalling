@@ -1,0 +1,8 @@
+# tutaj: /usr/local/lib/python3.6/dist-packages/tombo
+
+_preprocess.py:55:    # ~maciosz: pliki z nanopora nie maja slotu read_id, maja read_number
+_preprocess.py:104:        # ~maciosz: why up to the underscore?? i need this line to look like this:
+_preprocess.py:106:        # now it works fine. maciosz~
+_preprocess.py:385:            # ~maciosz: needed to add r+
+resquiggle.py:1259:    # ~maciosz: it was try and except KeyError here
+resquiggle.py:1333:        seq_data.id, #.decode(), ~commented out by maciosz

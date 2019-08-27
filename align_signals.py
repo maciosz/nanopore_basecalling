@@ -7,6 +7,12 @@ PENALTY1 = -0.2
 PENALTY2 = -0.2
 OPEN_PENALTY1 = -20.
 OPEN_PENALTY2 = -20.
+MATCH_REWARD = 0.1
+# match reward to stala dodawana do roznicy miedzy sygnalami
+# zeby punktowac dopasowywanie do siebie sygnalu, nawet jesli jakos sie roznia
+# nie ma znaczenia w przypadku nieilosciowych sekwencji
+# to NIE jest nagroda za dopasowanie takich samych symboli
+
 # to powinno byc znormalizowane tak zeby uwzgledniac srednie roznice miedzy porownywanymi sygnalami
 # albo moze znormalizowac najpierw sygnaly?
 # w kazdym razie zeby nie bylo ze zawsze sie oplaca zrobic jeden duzy gap obejmujacy cala sekwencje
@@ -24,6 +30,8 @@ def argument_parsing():
                         help='second sequence')
     parser.add_argument('-n', '--normalise', action='store_true',
                         help='should the signal be normalised?')
+    parser.add_argument('-l', '--local', action='store_true',
+                        help='perform local alignment (global by default)')
     parser.add_argument('-o', dest='output', action='store', default='output.tab',
                         help='name of the output file (defaults to output.tab)')
     return parser.parse_args()
@@ -34,7 +42,7 @@ def normalise(signal):
     signal = [(i - mean_value) / sd for i in signal]
     return signal
 
-def score(char1, char2, gap1_opened = False, gap2_opened = False):
+def score(char1, char2, gap1_opened=False, gap2_opened=False):
     if char1 == "-":
         if gap1_opened:
             return PENALTY1
@@ -48,7 +56,7 @@ def score(char1, char2, gap1_opened = False, gap2_opened = False):
     try:
         # na pewno -abs()?
         #return -abs(float(char1) - float(char2))
-        return -abs(char1 - char2)
+        return -abs(char1 - char2) + MATCH_REWARD
     except TypeError:
         return int(char1 == char2)
 
@@ -105,9 +113,12 @@ def move(x, y, direction):
     elif direction == MOVE_IN_2:
         return x, y-1, ('-', ' ', '.')
 
-def get_alignment(trace):
+def get_alignment(trace, end=None):
     n1, n2 = len(trace), len(trace[0])
-    direction = trace[-1][-1]
+    if end == None:
+        #global alignment
+        end = -1
+    direction = trace[-1][end] # czy [end][-1]?? czy end to dwie wspolrzedne?
     row, column, chars = move(n1-1, n2-1, direction)
     seq1, symbols, seq2 = chars
     not_end = True
@@ -178,12 +189,18 @@ def pretty_print_alignment(alignment, seq1, seq2):
     seq1_output = ''.join([str(i) for i in seq1_output])
     seq2_output = ''.join([str(i) for i in seq2_output])
     symbols = ''.join(symbols)
+    # to powinno byc bardziej 'uliniowione' wzgledem siebie
     print(seq1_output)
     print(symbols)
     print(seq2_output)
 
 def pretty_plot_alignment(alignment, seq1, seq2):
     # ale co tu zamierzalas zaimplementowac?
+    # moze plotowanie dwoch sygnalow, odpowiednio przeskalowane zeby byly zalajnowane
+    # to by byl spoko ficzer
+    pass
+
+def find_optimal_end(scores):
     pass
         
 def main():
@@ -195,8 +212,12 @@ def main():
     #print(seq2)
     scores, traces = align(seq1, seq2)
     #print(traces)
-    alignment = get_alignment(traces)
-    pretty_print_alignment(alignment, seq1, seq2)
+    end = None
+    if arguments.local:
+        end = find_optimal_end(scores)
+    alignment = get_alignment(traces, end)
+    print(''.join(alignment[1]))
+    #pretty_print_alignment(alignment, seq1, seq2)
     print(scores[-1][-1])
 
 if __name__ == '__main__':

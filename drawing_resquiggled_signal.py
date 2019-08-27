@@ -35,7 +35,8 @@ def main():
     start_sygnal = read[arguments.events_adress].attrs['read_start_rel_to_raw']
     #???
     end_sygnal = starts[-1] + start_sygnal
-    read_id = list(read["Raw/Reads"].items())[0][0]
+    #read_id = list(read["Raw/Reads"].items())[0][0]
+    read_id = list(read["Raw/Reads"].keys())[0]
     sygnal_all = read['Raw/Reads/' + read_id + '/Signal']
     sygnal_shift = np.median(sygnal_all)
     sygnal_scale = mad(sygnal_all)
